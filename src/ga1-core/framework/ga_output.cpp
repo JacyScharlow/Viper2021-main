@@ -47,13 +47,14 @@ void ga_output::update(ga_frame_params* params)
 {
 	// Update viewport in case window was resized:
 	int width, height;
-	SDL_GetWindowSize(static_cast<SDL_Window* >(_window), &width, &height);
+	SDL_GetWindowSize(static_cast<SDL_Window*>(_window), &width, &height);
 	glViewport(0, 0, width, height);
 
 	// Clear viewport:
-	glDepthMask(GL_TRUE);
-	glClearColor(0.0, 0.0, 0.0, 1.0);
-	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+	//glEnable(GL_LIGHTING);
+	//glDepthMask(GL_TRUE);
+	//glClearColor(0.0, 0.0, 0.0, 1.0);
+	//glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
 	// Compute projection matrices:
 	ga_mat4f perspective;
@@ -67,12 +68,69 @@ void ga_output::update(ga_frame_params* params)
 	ga_mat4f view_ortho = view * ortho;
 
 	// Draw all static geometry:
+
+	glEnable(GL_DEPTH_TEST); // standard depth testing
+	glDepthFunc(GL_LEQUAL);
+	glDepthMask(1);
+	glDisable(GL_STENCIL_TEST); // no stencil testing (this pass)
+	glColorMask(1, 1, 1, 1); // update color buffer
+	glClearStencil(0); // clear stencil to zero
+	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
+
 	for (auto& d : params->_static_drawcalls)
+	{	
+		d._material->set_lit(true); // FINAL : Jacy scharlow
+
+		d._material->bind(view_perspective, d._transform);
+		glBindVertexArray(d._vao);
+		glDrawElements(d._draw_mode, d._index_count, GL_UNSIGNED_SHORT, 0);
+	}
+
+	//***FINAL draw shadow volumes 
+
+	glEnable(GL_DEPTH_TEST);
+	glDepthFunc(GL_LESS);
+	glDepthMask(1); // do not disturb depth buffer
+	glColorMask(0, 0, 0, 0); // do not disturb color buffer
+	glStencilMask(~0u);
+	glEnable(GL_CULL_FACE); // use face culling
+	glCullFace(GL_BACK); // increment for front facing fragments
+	glStencilOp(GL_KEEP, GL_KEEP, GL_INCR); // that pass the depth test
+	for (auto& d : params->_shadow_drawcalls)
 	{
 		d._material->bind(view_perspective, d._transform);
 		glBindVertexArray(d._vao);
 		glDrawElements(d._draw_mode, d._index_count, GL_UNSIGNED_SHORT, 0);
 	}
+	glCullFace(GL_FRONT); // decrement for back facing fragments
+	glStencilOp(GL_KEEP, GL_KEEP, GL_DECR); // that pass the depth test
+	for (auto& d : params->_shadow_drawcalls)
+	{
+		d._material->bind(view_perspective, d._transform);
+		glBindVertexArray(d._vao);
+		glDrawElements(d._draw_mode, d._index_count, GL_UNSIGNED_SHORT, 0);
+	}
+
+	glCullFace(GL_BACK);
+
+	glEnable(GL_DEPTH_TEST);
+	glDepthFunc(GL_EQUAL); // must match depth from 1st step
+	glDepthMask(0);
+	glEnable(GL_STENCIL_TEST); // and use stencil to update only
+	glStencilFunc(GL_EQUAL, 0x1, 0x1); // pixels tagged as
+	glStencilOp(GL_KEEP, GL_KEEP, GL_KEEP); // “in the shadow volume”
+	glColorMask(1, 1, 1, 1);
+
+	for (auto& d : params->_static_drawcalls)
+	{
+		d._material->set_lit(false); // FINAL : Jacy scharlow
+
+		d._material->bind(view_perspective, d._transform);
+		glBindVertexArray(d._vao);
+		glDrawElements(d._draw_mode, d._index_count, GL_UNSIGNED_SHORT, 0);
+	}
+
+	//glDisable(GL_STENCIL_TEST);
 
 	// Draw all dynamic geometry:
 	draw_dynamic(params->_dynamic_drawcalls, view_perspective);
@@ -82,7 +140,7 @@ void ga_output::update(ga_frame_params* params)
 	assert(error == GL_NONE);
 
 	// Swap frame buffers:
-	SDL_GL_SwapWindow(static_cast<SDL_Window* >(_window));
+	SDL_GL_SwapWindow(static_cast<SDL_Window*>(_window));
 }
 
 void ga_output::draw_dynamic(const std::vector<ga_dynamic_drawcall>& drawcalls, const ga_mat4f& view_proj)

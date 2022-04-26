@@ -29,6 +29,8 @@ public:
 	virtual void bind(const ga_mat4f& view_proj, const ga_mat4f& transform) = 0;
 
 	virtual void set_color(const ga_vec3f& color) {}
+
+	virtual void set_lit(const bool _lit) {}
 };
 
 /*
@@ -39,6 +41,26 @@ class ga_unlit_texture_material : public ga_material
 public:
 	ga_unlit_texture_material(const char* texture_file);
 	~ga_unlit_texture_material();
+
+	virtual bool init() override;
+
+	virtual void bind(const ga_mat4f& view_proj, const ga_mat4f& transform) override;
+
+private:
+	std::string _texture_file;
+
+	ga_shader* _vs;
+	ga_shader* _fs;
+	ga_program* _program;
+	ga_texture* _texture;
+};
+
+class ga_lit_texture_material : public ga_material
+{
+public:
+	ga_lit_texture_material(const char* texture_file);
+	ga_lit_texture_material();
+	~ga_lit_texture_material();
 
 	virtual bool init() override;
 
@@ -93,4 +115,24 @@ private:
 	ga_program* _program;
 
 	struct ga_skeleton* _skeleton;
+};
+
+class ga_lit_material : public ga_material
+{
+public:
+	ga_lit_material();
+	~ga_lit_material();
+
+	virtual bool init() override;
+	virtual void bind(const ga_mat4f& view_proj, const ga_mat4f& transform) override;
+	void set_diffuse(ga_vec3f& color) { _color = color; }
+	void set_diffuse(float r, float g, float b) { _color.x = r; _color.y = g; _color.z = b; }
+	virtual void set_lit(const bool _lit) override { lit = _lit; }
+
+private:
+	ga_shader* _vs;
+	ga_shader* _fs;
+	ga_program* _program;
+	ga_vec3f _color;
+	bool lit;
 };

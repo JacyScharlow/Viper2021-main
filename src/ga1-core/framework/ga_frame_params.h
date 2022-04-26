@@ -76,6 +76,9 @@ struct ga_frame_params
 	std::vector<ga_static_drawcall> _static_drawcalls;
 	std::atomic_flag _static_drawcall_lock = ATOMIC_FLAG_INIT;
 
+	std::vector<ga_static_drawcall> _shadow_drawcalls;
+	std::atomic_flag _shadow_drawcall_lock = ATOMIC_FLAG_INIT;
+
 	std::vector<ga_dynamic_drawcall> _dynamic_drawcalls;
 	std::atomic_flag _dynamic_drawcall_lock = ATOMIC_FLAG_INIT;
 

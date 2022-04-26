@@ -17,6 +17,12 @@
 #include "entity/ga_entity.h"
 #include "entity/ga_lua_component.h"
 
+#include "graphics/ga_model_component.h" //*** Final: Added -Jacy Scharlow
+#include "graphics/f_obj_parser.h" //*** Final: Added -Jacy Scharlow
+#include "graphics/ga_geometry.h" //*** Final: Added -Jacy Scharlow
+#include "graphics/ga_egg_parser.h" //*** Final: Added -Jacy Scharlow
+#include "graphics/f_mesh.h" //*** Final: Added -Jacy Scharlow
+#include "graphics/f_render.h" //*** Final: Added -Jacy Scharlow
 #include "graphics/ga_cube_component.h"
 #include "graphics/ga_program.h"
 
@@ -28,12 +34,23 @@
 #define STB_TRUETYPE_IMPLEMENTATION
 #include <stb_truetype.h>
 
+#include <assimp/Importer.hpp>      // *** Final: Added -Jacy Scharlow C++ importer interface
+#include <assimp/postprocess.h>     // *** Final: Added -Jacy Scharlow Post processing flags
+
 #if defined(GA_MINGW)
 #include <unistd.h>
 #endif
 
 ga_font* g_font = nullptr;
 static void set_root_path(const char* exepath);
+
+
+//***Final: Added obj object references -Jacy Scharlow
+//====================================================
+ga_entity statue;
+ga_entity scene;
+ga_entity volume;
+//=================================================
 
 int main(int argc, const char** argv)
 {
@@ -44,26 +61,47 @@ int main(int argc, const char** argv)
 	// Create objects for three phases of the frame: input, sim and output.
 	ga_input* input = new ga_input();
 	ga_sim* sim = new ga_sim();
-	ga_output* output = new ga_output(input->get_window());
+	//ga_output* output = new ga_output(input->get_window());
+	f_render* render = new f_render(input->get_window());
 
 	// Create the default font:
 	g_font = new ga_font("VeraMono.ttf", 16.0f, 512, 512);
 
 	// Create camera.
-	ga_camera* camera = new ga_camera({ 0.0f, 7.0f, 20.0f });
+	//ga_camera* camera = new ga_camera({ 0.0f, 7.0f, 20.0f });
+	ga_camera* camera = new ga_camera({ 0.0f, 20.0f, 40.0f });
+	//ga_camera* camera = new ga_camera({ 0.0f, 50.0f, 0.0f });
 	ga_quatf rotation;
 	rotation.make_axis_angle(ga_vec3f::y_vector(), ga_degrees_to_radians(180.0f));
 	camera->rotate(rotation);
 	rotation.make_axis_angle(ga_vec3f::x_vector(), ga_degrees_to_radians(15.0f));
 	camera->rotate(rotation);
 
-	// Create an entity whose movement is driven by Lua script.
-	ga_entity lua;
-	lua.translate({ 0.0f, 2.0f, 1.0f });
-	ga_lua_component lua_move(&lua, "data/scripts/move.lua");
-	ga_cube_component lua_model(&lua, "data/textures/rpi.png");
-	sim->add_entity(&lua);
+	//***Final:Scene Rendering -Jacy Scharlow
+	ga_model scene_model;
+	Mesh *scene_mesh = new Mesh();
+	obj_to_model("data/models/soft_col.obj", &scene_model, scene_mesh);
 
+	ga_model statue_model;
+	Mesh* statue_mesh = new Mesh();
+	obj_to_model("data/models/uvv.obj", &statue_model, statue_mesh);
+
+	std::vector<ga_vec3f> quads;
+	scene_mesh->packShadowVolumes( &quads );
+	statue_mesh->packShadowVolumes( &quads );
+	
+	//***********************************************
+	//********CONSTRUCTION***************************
+
+	ga_model_component scene_comp(&scene, &scene_model);
+	sim->add_entity(&scene);
+	
+	ga_model_component model_comp(&statue, &statue_model);
+	sim->add_entity(&statue);
+	
+	ga_cube_component stencil_comp(&volume, quads);
+	sim->add_entity(&volume);
+	
 	// Main loop:
 	while (true)
 	{
@@ -75,7 +113,7 @@ int main(int argc, const char** argv)
 		{
 			break;
 		}
-
+		
 		// Update the camera.
 		camera->update(&params);
 
@@ -86,13 +124,19 @@ int main(int argc, const char** argv)
 		sim->late_update(&params);
 
 		// Draw to screen.
-		output->update(&params);
+		// output->update(&params);
+		render->shadow = true;
+		render->update(&params);
+
 	}
 
-	delete output;
+	//delete output;
 	delete sim;
 	delete input;
 	delete camera;
+
+	delete scene_mesh;
+	delete statue_mesh;
 
 	ga_job::shutdown();
 

@@ -19,7 +19,7 @@
 class ga_cube_component : public ga_component
 {
 public:
-	ga_cube_component(class ga_entity* ent, const char* texture_file);
+	ga_cube_component(ga_entity* ent, std::vector<ga_vec3f> quads);
 	virtual ~ga_cube_component();
 
 	virtual void update(struct ga_frame_params* params) override;
